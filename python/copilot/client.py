@@ -681,14 +681,23 @@ class CopilotClient:
 
     async def get_last_session_id(self) -> Optional[str]:
         """
-        Return the last session id known by the CLI server, or ``None`` if no
-        sessions exist.
+        Return the ID of the most recently updated session known by the CLI
+        server, or ``None`` if no sessions exist.
+
+        The "last" session is determined by the session's ``modifiedTime``
+        on the server, not by when this method is called locally.
 
         Raises:
             RuntimeError: If the client is not connected.
 
         Example:
-            >>> last = await client.get_last_session_id()
+            >>> last_id = await client.get_last_session_id()
+            >>> if last_id is not None:
+            ...     # Resume the most recently updated session
+            ...     session = await client.resume_session(
+            ...         ResumeSessionConfig(session_id=last_id)
+            ...     )
+            ...     await session.send({"prompt": "Continue where we left off."})
         """
         if not self._client:
             raise RuntimeError("Client not connected")
