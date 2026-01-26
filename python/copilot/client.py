@@ -679,6 +679,23 @@ class CopilotClient:
         response = await self._client.request("session.list", {})
         return response.get("sessions", [])
 
+    async def get_last_session_id(self) -> Optional[str]:
+        """
+        Return the last session id known by the CLI server, or ``None`` if no
+        sessions exist.
+
+        Raises:
+            RuntimeError: If the client is not connected.
+
+        Example:
+            >>> last = await client.get_last_session_id()
+        """
+        if not self._client:
+            raise RuntimeError("Client not connected")
+
+        response = await self._client.request("session.getLastId", {})
+        return response.get("sessionId")
+
     async def delete_session(self, session_id: str) -> None:
         """
         Delete a session permanently.

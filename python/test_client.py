@@ -92,3 +92,38 @@ class TestURLParsing:
     def test_is_external_server_true(self):
         client = CopilotClient({"cli_url": "localhost:8080", "log_level": "error"})
         assert client._is_external_server
+
+
+class TestGetLastSessionId:
+    @pytest.mark.asyncio
+    async def test_raises_when_not_connected(self):
+        client = CopilotClient()
+        with pytest.raises(RuntimeError, match="Client not connected"):
+            await client.get_last_session_id()
+
+    @pytest.mark.asyncio
+    async def test_returns_session_id(self):
+        class DummyClient:
+            def __init__(self, resp):
+                self._resp = resp
+
+            async def request(self, method, payload):
+                assert method == "session.getLastId"
+                assert payload == {}
+                return self._resp
+
+        client = CopilotClient()
+        client._client = DummyClient({"sessionId": "session-123"})
+        assert await client.get_last_session_id() == "session-123"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_no_sessions(self):
+        class DummyClient:
+            async def request(self, method, payload):
+                assert method == "session.getLastId"
+                assert payload == {}
+                return {}
+
+        client = CopilotClient()
+        client._client = DummyClient()
+        assert await client.get_last_session_id() is None

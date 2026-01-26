@@ -135,3 +135,53 @@ class TestClient:
             await client.stop()
         finally:
             await client.force_stop()
+
+    @pytest.mark.asyncio
+    async def test_should_get_last_session_id(self):
+        client = CopilotClient({"cli_path": CLI_PATH, "use_stdio": True})
+
+        try:
+            await client.start()
+
+            await client.create_session()
+
+            last = await client.get_last_session_id()
+            # The server may return the most-recently-updated/persisted session id,
+            # which can differ from the in-memory session id returned by create_session.
+            # Ensure the returned id is valid by attempting to resume it.
+            assert last is not None
+            resumed = await client.resume_session(last)
+            assert resumed.session_id == last
+
+            await client.stop()
+        finally:
+            await client.force_stop()
+
+    @pytest.mark.asyncio
+    async def test_get_last_session_id_returns_none_when_no_sessions(self):
+        client = CopilotClient({"cli_path": CLI_PATH, "use_stdio": True})
+
+        try:
+            await client.start()
+
+            # Delete all sessions to ensure none are present
+            sessions = await client.list_sessions()
+            for s in sessions:
+                try:
+                    await client.delete_session(s["sessionId"])
+                except Exception:
+                    # Ignore failures deleting sessions (e.g., remote sessions or missing files)
+                    pass
+
+            # Re-check sessions; if any remain, skip the test
+            # since the server has persisted/remote sessions
+            sessions_after = await client.list_sessions()
+            if len(sessions_after) > 0:
+                pytest.skip("Server has persisted sessions; cannot ensure none are present")
+
+            last = await client.get_last_session_id()
+            assert last is None
+
+            await client.stop()
+        finally:
+            await client.force_stop()
