@@ -352,6 +352,24 @@ export interface SessionConfig {
     model?: string;
 
     /**
+     * Skip model enablement validation when creating the session.
+     *
+     * By default, createSession() validates that the specified model is enabled
+     * by calling listModels(). This adds a small performance overhead.
+     *
+     * Set this to true to skip validation in performance-sensitive scenarios where:
+     * - You've already validated the model separately
+     * - You're creating many sessions rapidly
+     * - You want to handle validation errors at the first message send instead
+     *
+     * Warning: Skipping validation may result in sessions that timeout or fail
+     * when sending messages if the model is disabled or unconfigured.
+     *
+     * @default false
+     */
+    skipModelValidation?: boolean;
+
+    /**
      * Override the default configuration directory location.
      * When specified, the session will use this directory for storing config and state.
      */

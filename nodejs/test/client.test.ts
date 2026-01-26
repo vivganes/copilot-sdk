@@ -122,6 +122,32 @@ describe("CopilotClient", () => {
             // Restore original
             client.listModels = originalListModels;
         });
+
+        it("should return false for models with no policy field", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return a model without a policy field
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [
+                {
+                    id: "no-policy-model",
+                    name: "No Policy Model",
+                    capabilities: {
+                        supports: { vision: false },
+                        limits: { max_context_window_tokens: 4096 },
+                    },
+                    // policy is undefined
+                },
+            ];
+
+            const isEnabled = await client.isModelEnabled("no-policy-model");
+            expect(isEnabled).toBe(false);
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
     });
 
     describe("createSession model validation", () => {
@@ -196,6 +222,33 @@ describe("CopilotClient", () => {
             client.listModels = originalListModels;
         });
 
+        it("should throw error for model with no policy field", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return a model without a policy field
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [
+                {
+                    id: "no-policy-model",
+                    name: "No Policy Model",
+                    capabilities: {
+                        supports: { vision: false },
+                        limits: { max_context_window_tokens: 4096 },
+                    },
+                    // policy is undefined
+                },
+            ];
+
+            await expect(client.createSession({ model: "no-policy-model" })).rejects.toThrow(
+                "Cannot create session: Model 'no-policy-model' is not enabled (status: unknown)"
+            );
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+
         it("should succeed for enabled model", async () => {
             const client = new CopilotClient({ cliPath: CLI_PATH });
             await client.start();
@@ -233,6 +286,78 @@ describe("CopilotClient", () => {
             const session = await client.createSession();
             expect(session).toBeDefined();
             await session.destroy();
+        });
+
+        it("should skip validation when skipModelValidation is true", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return a disabled model
+            const originalListModels = client.listModels.bind(client);
+            let listModelsCalled = false;
+            client.listModels = async () => {
+                listModelsCalled = true;
+                return [
+                    {
+                        id: "disabled-model",
+                        name: "Disabled Model",
+                        capabilities: {
+                            supports: { vision: false },
+                            limits: { max_context_window_tokens: 4096 },
+                        },
+                        policy: { state: "disabled", terms: "" },
+                    },
+                ];
+            };
+
+            // This should NOT throw and should NOT call listModels
+            const session = await client.createSession({
+                model: "disabled-model",
+                skipModelValidation: true,
+            });
+            expect(session).toBeDefined();
+            expect(listModelsCalled).toBe(false);
+            await session.destroy();
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+
+        it("should still validate when skipModelValidation is false", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return a disabled model
+            const originalListModels = client.listModels.bind(client);
+            let listModelsCalled = false;
+            client.listModels = async () => {
+                listModelsCalled = true;
+                return [
+                    {
+                        id: "disabled-model",
+                        name: "Disabled Model",
+                        capabilities: {
+                            supports: { vision: false },
+                            limits: { max_context_window_tokens: 4096 },
+                        },
+                        policy: { state: "disabled", terms: "" },
+                    },
+                ];
+            };
+
+            // This SHOULD throw and SHOULD call listModels
+            await expect(
+                client.createSession({
+                    model: "disabled-model",
+                    skipModelValidation: false,
+                })
+            ).rejects.toThrow("Cannot create session: Model 'disabled-model' is not enabled");
+            expect(listModelsCalled).toBe(true);
+
+            // Restore original
+            client.listModels = originalListModels;
         });
     });
 

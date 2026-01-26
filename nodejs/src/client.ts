@@ -403,9 +403,14 @@ export class CopilotClient {
      * If the client is not connected and `autoStart` is enabled, this will automatically
      * start the connection.
      *
+     * By default, if a model is specified, this method validates that it's enabled by calling
+     * listModels(). This prevents timeout issues but adds a small performance overhead.
+     * Use `skipModelValidation: true` in performance-sensitive scenarios to skip this check.
+     *
      * @param config - Optional configuration for the session
      * @returns A promise that resolves with the created session
      * @throws Error if the client is not connected and autoStart is disabled
+     * @throws Error if the specified model is not found or not enabled (unless skipModelValidation is true)
      *
      * @example
      * ```typescript
@@ -422,6 +427,12 @@ export class CopilotClient {
      *     handler: async (args) => ({ temperature: 72 })
      *   }]
      * });
+     *
+     * // Skip validation for performance-sensitive scenarios
+     * const session = await client.createSession({
+     *   model: "gpt-4",
+     *   skipModelValidation: true
+     * });
      * ```
      */
     async createSession(config: SessionConfig = {}): Promise<CopilotSession> {
@@ -433,8 +444,8 @@ export class CopilotClient {
             }
         }
 
-        // Validate model enablement if a model is specified
-        if (config.model) {
+        // Validate model enablement if a model is specified and validation is not skipped
+        if (config.model && !config.skipModelValidation) {
             const models = await this.listModels();
             const modelInfo = models.find((m) => m.id === config.model);
 
@@ -655,6 +666,10 @@ export class CopilotClient {
      * ```
      */
     async isModelEnabled(model: string): Promise<boolean> {
+        if (!this.connection) {
+            throw new Error("Client not connected");
+        }
+
         const models = await this.listModels();
         const modelInfo = models.find((m) => m.id === model);
 
