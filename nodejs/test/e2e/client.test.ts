@@ -133,4 +133,82 @@ describe("Client", () => {
 
         await client.stop();
     });
+
+    it("should check if a model is enabled when authenticated", async () => {
+        const client = new CopilotClient({ cliPath: CLI_PATH, useStdio: true });
+        onTestFinishedForceStop(client);
+
+        await client.start();
+
+        const authStatus = await client.getAuthStatus();
+        if (!authStatus.isAuthenticated) {
+            // Skip if not authenticated
+            await client.stop();
+            return;
+        }
+
+        const models = await client.listModels();
+        if (models.length === 0) {
+            await client.stop();
+            return;
+        }
+
+        // Find an enabled model if available
+        const enabledModel = models.find((m) => m.policy?.state === "enabled");
+        if (enabledModel) {
+            const isEnabled = await client.isModelEnabled(enabledModel.id);
+            expect(isEnabled).toBe(true);
+        }
+
+        // Test with a non-existent model
+        const nonExistent = await client.isModelEnabled("definitely-not-a-real-model-12345");
+        expect(nonExistent).toBe(false);
+
+        await client.stop();
+    });
+
+    it("should validate model enablement when creating session", async () => {
+        const client = new CopilotClient({ cliPath: CLI_PATH, useStdio: true });
+        onTestFinishedForceStop(client);
+
+        await client.start();
+
+        const authStatus = await client.getAuthStatus();
+        if (!authStatus.isAuthenticated) {
+            // Skip if not authenticated
+            await client.stop();
+            return;
+        }
+
+        const models = await client.listModels();
+        if (models.length === 0) {
+            await client.stop();
+            return;
+        }
+
+        // Test creating session with non-existent model
+        await expect(
+            client.createSession({ model: "definitely-not-a-real-model-12345" })
+        ).rejects.toThrow("Model 'definitely-not-a-real-model-12345' not found");
+
+        // Find a disabled or unconfigured model if available
+        const disabledModel = models.find(
+            (m) => m.policy?.state === "disabled" || m.policy?.state === "unconfigured"
+        );
+        if (disabledModel) {
+            await expect(client.createSession({ model: disabledModel.id })).rejects.toThrow(
+                `Cannot create session: Model '${disabledModel.id}' is not enabled`
+            );
+        }
+
+        // Test that enabled model works
+        const enabledModel = models.find((m) => m.policy?.state === "enabled");
+        if (enabledModel) {
+            const session = await client.createSession({ model: enabledModel.id });
+            expect(session).toBeDefined();
+            await session.destroy();
+        }
+
+        await client.stop();
+    });
 });

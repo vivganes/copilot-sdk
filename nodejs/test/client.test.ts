@@ -28,6 +28,214 @@ describe("CopilotClient", () => {
         });
     });
 
+    describe("isModelEnabled", () => {
+        it("should return true for enabled models", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return a model with enabled state
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [
+                {
+                    id: "test-model",
+                    name: "Test Model",
+                    capabilities: {
+                        supports: { vision: false },
+                        limits: { max_context_window_tokens: 4096 },
+                    },
+                    policy: { state: "enabled", terms: "" },
+                },
+            ];
+
+            const isEnabled = await client.isModelEnabled("test-model");
+            expect(isEnabled).toBe(true);
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+
+        it("should return false for disabled models", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return a model with disabled state
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [
+                {
+                    id: "test-model",
+                    name: "Test Model",
+                    capabilities: {
+                        supports: { vision: false },
+                        limits: { max_context_window_tokens: 4096 },
+                    },
+                    policy: { state: "disabled", terms: "" },
+                },
+            ];
+
+            const isEnabled = await client.isModelEnabled("test-model");
+            expect(isEnabled).toBe(false);
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+
+        it("should return false for unconfigured models", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return a model with unconfigured state
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [
+                {
+                    id: "test-model",
+                    name: "Test Model",
+                    capabilities: {
+                        supports: { vision: false },
+                        limits: { max_context_window_tokens: 4096 },
+                    },
+                    policy: { state: "unconfigured", terms: "" },
+                },
+            ];
+
+            const isEnabled = await client.isModelEnabled("test-model");
+            expect(isEnabled).toBe(false);
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+
+        it("should return false for non-existent models", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return an empty array
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [];
+
+            const isEnabled = await client.isModelEnabled("non-existent-model");
+            expect(isEnabled).toBe(false);
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+    });
+
+    describe("createSession model validation", () => {
+        it("should throw error for non-existent model", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return an empty array
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [];
+
+            await expect(client.createSession({ model: "non-existent-model" })).rejects.toThrow(
+                "Model 'non-existent-model' not found"
+            );
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+
+        it("should throw error for disabled model", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return a disabled model
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [
+                {
+                    id: "disabled-model",
+                    name: "Disabled Model",
+                    capabilities: {
+                        supports: { vision: false },
+                        limits: { max_context_window_tokens: 4096 },
+                    },
+                    policy: { state: "disabled", terms: "" },
+                },
+            ];
+
+            await expect(client.createSession({ model: "disabled-model" })).rejects.toThrow(
+                "Cannot create session: Model 'disabled-model' is not enabled (status: disabled)"
+            );
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+
+        it("should throw error for unconfigured model", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return an unconfigured model
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [
+                {
+                    id: "unconfigured-model",
+                    name: "Unconfigured Model",
+                    capabilities: {
+                        supports: { vision: false },
+                        limits: { max_context_window_tokens: 4096 },
+                    },
+                    policy: { state: "unconfigured", terms: "" },
+                },
+            ];
+
+            await expect(client.createSession({ model: "unconfigured-model" })).rejects.toThrow(
+                "Cannot create session: Model 'unconfigured-model' is not enabled (status: unconfigured)"
+            );
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+
+        it("should succeed for enabled model", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // Mock listModels to return an enabled model
+            const originalListModels = client.listModels.bind(client);
+            client.listModels = async () => [
+                {
+                    id: "enabled-model",
+                    name: "Enabled Model",
+                    capabilities: {
+                        supports: { vision: false },
+                        limits: { max_context_window_tokens: 4096 },
+                    },
+                    policy: { state: "enabled", terms: "" },
+                },
+            ];
+
+            // This should not throw
+            const session = await client.createSession({ model: "enabled-model" });
+            expect(session).toBeDefined();
+            await session.destroy();
+
+            // Restore original
+            client.listModels = originalListModels;
+        });
+
+        it("should succeed when no model is specified", async () => {
+            const client = new CopilotClient({ cliPath: CLI_PATH });
+            await client.start();
+            onTestFinished(() => client.forceStop());
+
+            // This should not throw - model validation is skipped when no model specified
+            const session = await client.createSession();
+            expect(session).toBeDefined();
+            await session.destroy();
+        });
+    });
+
     describe("URL parsing", () => {
         it("should parse port-only URL format", () => {
             const client = new CopilotClient({

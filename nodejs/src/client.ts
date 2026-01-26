@@ -433,6 +433,26 @@ export class CopilotClient {
             }
         }
 
+        // Validate model enablement if a model is specified
+        if (config.model) {
+            const models = await this.listModels();
+            const modelInfo = models.find((m) => m.id === config.model);
+
+            if (!modelInfo) {
+                throw new Error(
+                    `Model '${config.model}' not found. Use listModels() to see available models.`
+                );
+            }
+
+            if (modelInfo.policy?.state !== "enabled") {
+                const state = modelInfo.policy?.state || "unknown";
+                throw new Error(
+                    `Cannot create session: Model '${config.model}' is not enabled (status: ${state}). ` +
+                        `Please enable this model in your account settings before using it.`
+                );
+            }
+        }
+
         const response = await this.connection!.sendRequest("session.create", {
             model: config.model,
             sessionId: config.sessionId,
@@ -614,6 +634,35 @@ export class CopilotClient {
         const result = await this.connection.sendRequest("models.list", {});
         const response = result as { models: ModelInfo[] };
         return response.models;
+    }
+
+    /**
+     * Check if a specific model is enabled and available for use.
+     *
+     * This method verifies that a model exists and has a policy state of "enabled".
+     * Models with "disabled" or "unconfigured" states require user action before use.
+     *
+     * @param model - The model ID to check (e.g., "claude-sonnet-4.5")
+     * @returns A promise that resolves to true if the model is enabled, false otherwise
+     * @throws Error if not authenticated or not connected
+     *
+     * @example
+     * ```typescript
+     * const isEnabled = await client.isModelEnabled("claude-sonnet-4.5");
+     * if (isEnabled) {
+     *   const session = await client.createSession({ model: "claude-sonnet-4.5" });
+     * }
+     * ```
+     */
+    async isModelEnabled(model: string): Promise<boolean> {
+        const models = await this.listModels();
+        const modelInfo = models.find((m) => m.id === model);
+
+        if (!modelInfo) {
+            return false;
+        }
+
+        return modelInfo.policy?.state === "enabled";
     }
 
     /**
