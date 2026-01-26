@@ -161,7 +161,7 @@ describe("CopilotClient", () => {
             client.listModels = async () => [];
 
             await expect(client.createSession({ model: "non-existent-model" })).rejects.toThrow(
-                "Model 'non-existent-model' not found"
+                "Model 'non-existent-model' not found. Use listModels() to see available models."
             );
 
             // Restore original
@@ -188,7 +188,7 @@ describe("CopilotClient", () => {
             ];
 
             await expect(client.createSession({ model: "disabled-model" })).rejects.toThrow(
-                "Cannot create session: Model 'disabled-model' is not enabled (status: disabled)"
+                "Cannot create session: Model 'disabled-model' is not enabled (status: disabled). Please enable this model in your account settings before using it."
             );
 
             // Restore original
@@ -215,7 +215,7 @@ describe("CopilotClient", () => {
             ];
 
             await expect(client.createSession({ model: "unconfigured-model" })).rejects.toThrow(
-                "Cannot create session: Model 'unconfigured-model' is not enabled (status: unconfigured)"
+                "Cannot create session: Model 'unconfigured-model' is not enabled (status: unconfigured). Please enable this model in your account settings before using it."
             );
 
             // Restore original

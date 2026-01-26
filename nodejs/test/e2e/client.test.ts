@@ -189,15 +189,20 @@ describe("Client", () => {
         // Test creating session with non-existent model
         await expect(
             client.createSession({ model: "definitely-not-a-real-model-12345" })
-        ).rejects.toThrow("Model 'definitely-not-a-real-model-12345' not found");
+        ).rejects.toThrow(
+            "Model 'definitely-not-a-real-model-12345' not found. Use listModels() to see available models."
+        );
 
         // Find a disabled or unconfigured model if available
         const disabledModel = models.find(
             (m) => m.policy?.state === "disabled" || m.policy?.state === "unconfigured"
         );
         if (disabledModel) {
+            const state = disabledModel.policy?.state;
             await expect(client.createSession({ model: disabledModel.id })).rejects.toThrow(
-                `Cannot create session: Model '${disabledModel.id}' is not enabled`
+                new RegExp(
+                    `Cannot create session: Model '${disabledModel.id}' is not enabled \\(status: ${state}\\)\\. Please enable this model in your account settings before using it\\.`
+                )
             );
         }
 
