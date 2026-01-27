@@ -141,7 +141,7 @@ export class CopilotSession {
         });
 
         let lastAssistantMessage: AssistantMessageEvent | undefined;
-        let timeoutId: ReturnType<typeof setTimeout>;
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
         // Register event handler BEFORE calling send to avoid race condition
         // where session.idle fires before we start listening
@@ -175,7 +175,9 @@ export class CopilotSession {
 
             return lastAssistantMessage;
         } finally {
-            clearTimeout(timeoutId!);
+            if (timeoutId !== undefined) {
+                clearTimeout(timeoutId);
+            }
             unsubscribe();
         }
     }

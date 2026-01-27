@@ -75,5 +75,19 @@ describe("CopilotSession", () => {
                 /Timeout after 50ms waiting for session.idle/
             );
         });
+
+        it("should handle send() throwing before timeout is created", async () => {
+            // Make send() throw an error
+            mockConnection.sendRequest = vi.fn().mockRejectedValue(new Error("Send failed"));
+
+            const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+            await expect(session.sendAndWait({ prompt: "test" }, 5000)).rejects.toThrow(
+                "Send failed"
+            );
+
+            // clearTimeout should not be called since timeout was never created
+            expect(clearTimeoutSpy).not.toHaveBeenCalled();
+        });
     });
 });
